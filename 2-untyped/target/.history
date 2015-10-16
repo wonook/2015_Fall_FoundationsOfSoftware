@@ -1,0 +1,13 @@
+run
+\y. ((\x. x) y)
+run
+clear
+clean
+run
+open .
+run
+x y z as asd f asf wer
+run
+compile
+run
+console

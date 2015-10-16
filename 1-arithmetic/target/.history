@@ -1,0 +1,17 @@
+run
+console
+ls
+console
+run
+exit
+run
+iszero false
+iszero 0
+succ true
+run
+pred pred succ 2
+run
+iszero pred pred succ 2
+run
+pred iszero pred pred succ 2
+run
