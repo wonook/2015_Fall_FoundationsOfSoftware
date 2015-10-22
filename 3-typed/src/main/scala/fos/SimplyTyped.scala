@@ -15,8 +15,80 @@ object SimplyTyped extends StandardTokenParsers {
   /** Term     ::= SimpleTerm { SimpleTerm }
    */
   def Term: Parser[Term] =
-    ???
+    rep1(simpleTerm) ^^ {case termlist => processTermList(termlist.reverse)}
+  def processTermList(tl: List[Term]): Term = {
+    if (tl.tail.isEmpty) tl.head
+    else App(processTermList(tl.tail), tl.head)
+  }
 
+  def simpleTerm: Parser[Term] = 
+  ( valueTerm |
+    funcTerm |
+    letTerm |
+    pairTerm
+    )
+
+  // Bool and Nat
+  /** valueTerm ::=
+   *   "true" |
+   *   "false" |
+   *   "if" Term "then" Term "else" Term
+   *   number |
+   *   "succ" Term
+   *   "pred" Term
+   *   "iszero" Term
+   */
+  def valueTerm: Parser[Term] =
+  ( "true" ^^ (t => True()) |
+    "false" ^^ (t => False()) |
+    ("if" ~> Term) ~ ("then" ~> Term) ~ ("else" ~> Term) ^^ {case t1 ~ t2 ~ t3 => If(t1, t2, t3)} |
+    numericValue |
+    "succ" ~> Term ^^ {case t => Succ(t)} |
+    "pred" ~> Term ^^ {case t => Pred(t)} |
+    "iszero" ~> Term ^^ {case t => IsZero(t)}
+    )
+  def numericValue: Parser[Term] =
+  ( numericLit ^^ {case n => transformNv(n.toInt) } |
+    "succ" ~> numericValue ^^ {case n => Succ(n)}
+    )
+  def transformNv(n: Int): Term = {
+    n match {
+      case 0 => Zero()
+      case t if t != 0 => Succ(transformNv(t - 1))
+    }
+  }
+
+  // function types
+  /** funcTerm ::=
+   *   ident (variable) |
+   *   "\\" ident ":" Type "." Term
+   *   "(" Term ")"
+   */
+  def funcTerm: Parser[Term] =
+  ( ident ^^ {case e => Var(e)} |
+    ("\\" ~> ident) ~ (":" ~> Type) ~ ("." ~> Term) ^^ {case vr ~ tp ~ t => Abs(vr, tp, t)} |
+    "(" ~> Term <~ ")"
+    )
+
+  // let type
+  /** letTerm ::=
+   *   "let" Term ":" Type "=" Term "in" Term
+   */
+  def letTerm: Parser[Term] =
+  ( ("let" ~> Term) ~ (":" ~> Type) ~ ("=" ~> Term) ~ ("in" ~> Term) ^^ {case x ~ tp ~ t1 ~ t2 => App(Abs(x, tp, t2), t1)}
+    )
+
+  // pair type
+  /** pairTerm ::=
+   *   "{" Term "," Term "}" |
+   *   "fst" Term
+   *   "snd" Term
+   */
+  def pairTerm: Parser[Term] =
+  ( ("{" ~> Term) ~ ("," ~> Term <~ "}") ^^ {case t1 ~ t2 => TermPair(t1, t2)} |
+    "fst" ~> Term ^^ {case t => First(t)} |
+    "snd" ~> Term ^^ {case t => Second(t)}
+    )
 
 
   /** Thrown when no reduction rule applies to the given term. */
