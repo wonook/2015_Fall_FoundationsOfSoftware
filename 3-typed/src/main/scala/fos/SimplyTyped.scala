@@ -92,10 +92,13 @@ object SimplyTyped extends StandardTokenParsers {
 ////////////////////////////TERMS FINISHED//////////////////////////
 
   def Type: Parser[Type] = 
+  ( (simpleType <~ "->") ~ simpleType ^^ {case t1 ~ t2 => TypeFun(t1, t2)} |
+    (simpleType <~ "*") ~ simpleType ^^ {case t1 ~ t2 => TypePair(t1, t2)} |
+    simpleType
+    )
+  def simpleType: Parser[Type] =
   ( "Bool" ^^ (t => TypeBool) |
     "Nat" ^^ (t => TypeNat) |
-    (Type <~ "->") ~ Type ^^ {case t1 ~ t2 => TypeFun(t1, t2)} |
-    (Type <~ "*") ~ Type ^^ {case t1 ~ t2 => TypePair(t1, t2)} |
     "(" ~> Type <~ ")"
     )
 ////////////////////////////TYPES FINISHED//////////////////////////
@@ -282,21 +285,21 @@ object SimplyTyped extends StandardTokenParsers {
       }
       case App(t1, t2) => (typeof(ctx, t1), typeof(ctx, t2)) match {
         case (TypeFun(tp1, tp2), (tp3: Type)) if(tp1 == tp3) => tp2
-        case (TypeFun(tp1, tp2), (tp3: Type)) if(tp1 != tp3) => throw new TypeError(t, "Applying wrong type to a function")
-        case _ => throw new TypeError(t, "Applying something to that's not a function")
+        case (TypeFun(tp1, tp2), (tp3: Type)) if(tp1 != tp3) => throw new TypeError(t, "parameter type mismatch: expected " + tp1.toString + ", found " + tp3.toString)
+        case ((tp1: Type), _) => throw new TypeError(t, "function type expected but " + tp1.toString + " found")
       }
 
       case TermPair(t1, t2) => TypePair(typeof(ctx, t1), typeof(ctx, t2))
       case First(t0) => typeof(ctx, t0) match {
         case TypePair(tp1, tp2) => tp1
-        case _ => throw new TypeError(t, "First of not a Pair")
+        case (tp0: Type) => throw new TypeError(t, "pair type expected but " + tp0.toString + " found")
       }
       case Second(t0) => typeof(ctx, t0) match {
         case TypePair(tp1, tp2) => tp2
-        case _ => throw new TypeError(t, "Second of not a Pair")
+        case (tp0: Type) => throw new TypeError(t, "pair type expected but " + tp0.toString + " found")
       }
 
-      case _ => throw new TypeError(t, "Not recognized type")
+      case _ => throw new TypeError(t, "unexpected term")
     }
 
 
