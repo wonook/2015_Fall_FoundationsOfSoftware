@@ -49,7 +49,7 @@ object SimplyTyped extends StandardTokenParsers {
     ("\\" ~> ident) ~ (":" ~> Type) ~ ("." ~> Term) ^^ {case (vr: String) ~ (tp: Type) ~ (t: Term) => Abs(vr, tp, t)} |
     "(" ~> Term <~ ")" |
     ("let" ~> ident) ~ (":" ~> Type) ~ ("=" ~> Term) ~ ("in" ~> Term) ^^ {case (x: String) ~ (tp: Type) ~ (t1: Term) ~ (t2: Term) => App(Abs(x, tp, t2), t1)} |
-    ("{" ~> Term) ~ ("," ~> Term <~ "}") ^^ {case t1 ~ t2 => TermPair(t1, t2)} |
+  	("{" ~> Term) ~ ("," ~> Term <~ "}") ^^ {case t1 ~ t2 => TermPair(t1, t2)} |
     "fst" ~> Term ^^ {case t => First(t)} |
     "snd" ~> Term ^^ {case t => Second(t)}
     )
@@ -71,7 +71,7 @@ object SimplyTyped extends StandardTokenParsers {
     )
   def elemType: Parser[Type] =
   ( rep(simpleType <~ "*") ~ simpleType ^^ {case lst ~ tp => lst.foldRight(tp) {(a, b) => TypePair(a, b)}}
-    )
+  	)
   def simpleType: Parser[Type] =
   ( "Bool" ^^ (t => TypeBool) |
     "Nat" ^^ (t => TypeNat) |
@@ -150,9 +150,8 @@ object SimplyTyped extends StandardTokenParsers {
       case Var(vr) if (vr == x) => s
       case Var(vr) if (vr != x) => t
       case Abs(vr, tp, t0) if (vr == x) => t
-      case Abs(vr, tp, t0) => Abs(vr, tp, subst(t0, x, s))
-      // case Abs(vr, tp, t0) if (vr != x && !(FV(s).exists((v: String) => v == vr))) => Abs(vr, tp, subst(t0, x, s))
-      // case Abs(vr, tp, t0) if (vr != x && FV(s).exists((v: String) => v == vr)) => subst(alpha(t), x, s)
+      case Abs(vr, tp, t0) if (vr != x && !(FV(s).exists((v: String) => v == vr))) => Abs(vr, tp, subst(t0, x, s))
+      case Abs(vr, tp, t0) if (vr != x && FV(s).exists((v: String) => v == vr)) => subst(alpha(t), x, s)
       case App(t1, t2) => App(subst(t1, x, s), subst(t2, x, s))
 
       case TermPair(t1, t2) => TermPair(subst(t1, x, s), subst(t2, x, s))
@@ -202,22 +201,22 @@ object SimplyTyped extends StandardTokenParsers {
       case IsZero(Succ(nv)) if(isNumericValue(nv)) => False()
       case Pred(Zero()) => Zero()
       case Pred(Succ(nv)) if(isNumericValue(nv)) => nv
-      case App(Abs(vr, tp, t0), v) if(isValue(v)) => subst(t0, vr, v)
+      case App(Abs(vr, tp, t0), t1) if(isValue(t1)) => subst(t0, vr, t1)
 
       // Congruence Rules
       case If(con, t1, t2) => If(reduce(con), t1, t2)
       case IsZero(t0) => IsZero(reduce(t0))
       case Pred(t0) => Pred(reduce(t0))
       case Succ(t0) => Succ(reduce(t0))
-      case App(v, t2) if(isValue(v)) => App(v, reduce(t2))
+      case App(t1, t2) if(isValue(t1)) => App(t1, reduce(t2))
       case App(t1, t2) => App(reduce(t1), t2)
 
       // New evaluation rules
-      case First(TermPair(v1, v2)) if(isValue(v1) && isValue(v2)) => v1
-      case Second(TermPair(v1, v2)) if(isValue(v1) && isValue(v2)) => v2
+      case First(TermPair(t1, t2)) if(isValue(t1)&&isValue(t2)) => t1
+      case Second(TermPair(t1, t2)) if(isValue(t1)&&isValue(t2)) => t2
       case First(t0) => First(reduce(t0))
       case Second(t0) => Second(reduce(t0))
-      case TermPair(v, t2) if(isValue(v)) => TermPair(v, reduce(t2))
+      case TermPair(t1, t2) if(isValue(t1)) => TermPair(t1, reduce(t2))
       case TermPair(t1, t2) => TermPair(reduce(t1), t2)
 
       case _ => throw new NoRuleApplies(t)
