@@ -207,8 +207,8 @@ object SimplyTyped extends StandardTokenParsers {
       // Congruence Rules
       case If(con, t1, t2) => If(reduce(con), t1, t2)
       case IsZero(t0) => IsZero(reduce(t0))
-      case Pred(t0) => Pred(reduce(t0))
       case Succ(t0) => Succ(reduce(t0))
+      case Pred(t0) => Pred(reduce(t0))
       case App(v, t2) if(isValue(v)) => App(v, reduce(t2))
       case App(t1, t2) => App(reduce(t1), t2)
 
