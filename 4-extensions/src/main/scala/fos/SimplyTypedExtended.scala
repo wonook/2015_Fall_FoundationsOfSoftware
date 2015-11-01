@@ -48,18 +48,23 @@ object SimplyTypedExtended extends  StandardTokenParsers {
   def simpleTerm: Parser[Term] =
   ( "true" ^^ (t => True()) |
     "false" ^^ (t => False()) |
-    ("if" ~> Term) ~ ("then" ~> Term) ~ ("else" ~> Term) ^^ {case t1 ~ t2 ~ t3 => If(t1, t2, t3)} |
     numericValue |
-    "pred" ~> Term ^^ {case t => Pred(t)} |
     "succ" ~> Term ^^ {case t => Succ(t)} |
+    "pred" ~> Term ^^ {case t => Pred(t)} |
     "iszero" ~> Term ^^ {case t => IsZero(t)} |
+    ("if" ~> Term) ~ ("then" ~> Term) ~ ("else" ~> Term) ^^ {case t1 ~ t2 ~ t3 => If(t1, t2, t3)} |
     ident ^^ {case e => Var(e)} |
     ("\\" ~> ident) ~ (":" ~> Type) ~ ("." ~> Term) ^^ {case (vr: String) ~ (tp: Type) ~ (t: Term) => Abs(vr, tp, t)} |
     "(" ~> Term <~ ")" |
     ("let" ~> ident) ~ (":" ~> Type) ~ ("=" ~> Term) ~ ("in" ~> Term) ^^ {case (x: String) ~ (tp: Type) ~ (t1: Term) ~ (t2: Term) => App(Abs(x, tp, t2), t1)} |
     ("{" ~> Term) ~ ("," ~> Term <~ "}") ^^ {case t1 ~ t2 => TermPair(t1, t2)} |
     "fst" ~> Term ^^ {case t => First(t)} |
-    "snd" ~> Term ^^ {case t => Second(t)}
+    "snd" ~> Term ^^ {case t => Second(t)} |
+    ("inl" ~> Term) ~ ("as" ~> Type) ^^ {case t ~ tp => Inl(t, tp)} |
+    ("inr" ~> Term) ~ ("as" ~> Type) ^^ {case t ~ tp => Inr(t, tp)} |
+    ("case" ~> Term <~ "of") ~ ("inl" ~> ident) ~ ("=>" ~> Term <~ "|") ~ ("inr" ~> ident) ~ ("=>" ~> Term) ^^ {case t ~ vr1 ~ t1 ~ vr2 ~ t2 => Case(t, vr1, t1, vr2, t2)} |
+    "fix" ~> Term ^^ {case t => Fix(t)} |
+    ("letrec" ~> ident) ~ (":" ~> Type) ~ ("=" ~> Term) ~ ("in" ~> Term) ^^ {case x ~ tp ~ t1 ~ t2 => App(Abs(x, tp, t2), Fix(Abs(x, tp, t1)))}
     )
   def numericValue: Parser[Term] =
   ( numericLit ^^ {case n => transformNv(n.toInt) } |
@@ -75,29 +80,21 @@ object SimplyTypedExtended extends  StandardTokenParsers {
   /** Type       ::= SimpleType [ "->" Type ]
    */
   def Type: Parser[Type] = 
-  ( rep(elemType <~ "->") ~ elemType ^^ {case lst ~ tp => lst.foldRight(tp) {(a, b) => TypeFun(a, b)}}
+  ( rep(SimpleType <~ "->") ~ SimpleType ^^ {case lst ~ tp => lst.foldRight(tp) {(a, b) => TypeFun(a, b)}}
     )
-  def elemType: Parser[Type] =
-  ( rep(simpleType <~ "*") ~ simpleType ^^ {case lst ~ tp => lst.foldRight(tp) {(a, b) => TypePair(a, b)}}
+  /** SimpleType ::= BaseType [ ("*" SimpleType) | ("+" SimpleType) ]
+   */
+  def SimpleType: Parser[Type] =
+  ( rep(BaseType <~ "*") ~ BaseType ^^ {case lst ~ tp => lst.foldRight(tp) {(a, b) => TypePair(a, b)}} |
+    rep1(BaseType <~ "+") ~ BaseType ^^ {case lst ~ tp => lst.foldRight(tp) {(a, b) => TypeSum(a, b)}}
     )
-  def simpleType: Parser[Type] =
+  /** BaseType ::= "Bool" | "Nat" | "(" Type ")"
+   */
+  def BaseType: Parser[Type] =
   ( "Bool" ^^ (t => TypeBool) |
     "Nat" ^^ (t => TypeNat) |
     "(" ~> Type <~ ")"
     )
-
-  def Type: Parser[Type] =
-    ???
-
-  /** SimpleType ::= BaseType [ ("*" SimpleType) | ("+" SimpleType) ]
-   */
-  def SimpleType: Parser[Type] =
-    ???
-
-  /** BaseType ::= "Bool" | "Nat" | "(" Type ")"
-   */
-  def BaseType: Parser[Type] =
-    ???
 
 ///////////////////////////COPIED FROM MY ASSGN2////////////////////
   /** <p>
@@ -134,6 +131,11 @@ object SimplyTypedExtended extends  StandardTokenParsers {
       case First(t0) => First(processTerm(t0, v))
       case Second(t0) => Second(processTerm(t0, v))
 
+      case Inl(t, tp) => Inl(processTerm(t, v), tp)
+      case Inr(t, tp) => Inr(processTerm(t, v), tp)
+      case Case(t, vr1, t1, vr2, t2) => Case(processTerm(t), vr1, processTerm(t1), vr2, processTerm(t2))
+      case Fix(t) => Fix(processTerm(t))
+
       case _ => t
     }
   }
@@ -166,6 +168,14 @@ object SimplyTypedExtended extends  StandardTokenParsers {
       case First(t0) => First(subst(t0, x, s))
       case Second(t0) => Second(subst(t0, x, s))
 
+      case Inl(t, tp) => Inl(subst(t, x, s), tp)
+      case Inr(t, tp) => Inr(subst(t, x, s), tp)
+      case Case(t, vr1, t1, vr2, t2) if(x!=vr1 && x!=vr2) => Case(subst(t, x, s), vr1, subst(t1, x, s), vr2, subst(t2, x, s))
+      case Case(t, vr1, t1, vr2, t2) if(x!=vr1 && x==vr2) => Case(subst(t, x, s), vr1, subst(t1, x, s), vr2, t2)
+      case Case(t, vr1, t1, vr2, t2) if(x==vr1 && x!=vr2) => Case(subst(t, x, s), vr1, t1, vr2, subst(t2, x, s))
+      case Case(t, vr1, t1, vr2, t2) => Case(subst(t, x, s), vr1, t1, vr2, t2)
+      case Fix(t) => Fix(subst(t, x, s))
+
       case _ => t
     }
     //Free Variable test
@@ -187,6 +197,11 @@ object SimplyTypedExtended extends  StandardTokenParsers {
       case TermPair(t1, t2) => FV(t1):::FV(t2)
       case First(t0) => FV(t0)
       case Second(t0) => FV(t0)
+
+      case Inl(t, tp) => FV(t)
+      case Inr(t, tp) => FV(t)
+      case Case(t, vr1, t1, vr2, t2) => FV(t):::FV(t1):::FV(t2)
+      case Fix(t) => FV(t)
     }
 
 /////////////////////////////REDUCE/////////////////////////////////
@@ -227,6 +242,15 @@ object SimplyTypedExtended extends  StandardTokenParsers {
       case TermPair(v, t2) if(isValue(v)) => TermPair(v, reduce(t2))
       case TermPair(t1, t2) => TermPair(reduce(t1), t2)
 
+      // Extended evaluation rules
+      case Case(Inl(v0, tp), vr1, t1, vr2, t2) if(isValue(v0)) => subst(t1, vr1, v0)
+      case Case(Inr(v0, tp), vr1, t1, vr2, t2) if(isValue(v0)) => subst(t2, vr2, v0)
+      case Case(t, vr1, t1, vr2, t2) => Case(reduce(t), vr1, t1, vr2, t2)
+      case Inl(t, tp) => Inl(reduce(t), tp)
+      case Inr(t, tp) => Inr(reduce(t), tp)
+      case Fix(Abs(vr, tp, t)) => subst(t, vr, Fix(Abs(vr, tp, t)))
+      case Fix(t) => Fix(reduce(t))
+
       case _ => throw new NoRuleApplies(t)
     }
   def isValue(t: Term): Boolean =
@@ -235,7 +259,9 @@ object SimplyTypedExtended extends  StandardTokenParsers {
       case False() => true
       case nv if(isNumericValue(nv)) => true
       case Abs(vr, tp, t0) => true
-      case TermPair(t1, t2) => true
+      case TermPair(t1, t2) if(isValue(t1)&&isValue(t2)) => true
+      case Inl(t, tp) if(isValue(t)) => true
+      case Inr(t, tp) if(isValue(t)) => true
       case _ => false
     }
   def isNumericValue(t: Term): Boolean =
@@ -293,6 +319,17 @@ object SimplyTypedExtended extends  StandardTokenParsers {
       case Second(t0) => typeof(ctx, t0) match {
         case TypePair(tp1, tp2) => tp2
         case (tp0: Type) => throw new TypeError(t, "pair type expected but " + tp0.toString + " found")
+      }
+
+      case Case(t, vr1, t1, vr2, t2) => typeof(ctx, t) match {
+        case TypeSum(tp1, tp2) if(typeof((vr1, tp1)::ctx, t1)==typeof((vr2, tp2)::ctx, t2)) => typeof((vr1, tp1)::ctx, t1)
+        case (tp0: Type) => throw new TypeError(t, "sum type expected but " + tp0.toString + " found")
+      }
+      case Inl(t0, TypeSum(tp1, tp2)) if(typeof(ctx, t0) == tp1) => TypeSum(tp1, tp2)
+      case Inr(t0, TypeSum(tp1, tp2)) if(typeof(ctx, t0) == tp2) => TypeSum(tp1, tp2)
+      case Fix(t0) => typeof(ctx, t0) match {
+        case TypeFun(tp1, tp2) if(tp1==tp2) => tp1
+        case (tp0: Type) => throw new TypeError(t, "function type expected but " + tp0.toString + " found")
       }
 
       case _ => throw new TypeError(t, "unexpected term")
