@@ -80,13 +80,15 @@ object SimplyTypedExtended extends  StandardTokenParsers {
   /** Type       ::= SimpleType [ "->" Type ]
    */
   def Type: Parser[Type] = 
-  ( rep(SimpleType <~ "->") ~ SimpleType ^^ {case lst ~ tp => lst.foldRight(tp) {(a, b) => TypeFun(a, b)}}
+  ( SimpleType ~ ("->" ~> Type) ^^ {case tp1 ~ tp2 => TypeFun(tp1, tp2)} |
+    SimpleType
     )
   /** SimpleType ::= BaseType [ ("*" SimpleType) | ("+" SimpleType) ]
    */
   def SimpleType: Parser[Type] =
-  ( rep(BaseType <~ "*") ~ BaseType ^^ {case lst ~ tp => lst.foldRight(tp) {(a, b) => TypePair(a, b)}} |
-    rep1(BaseType <~ "+") ~ BaseType ^^ {case lst ~ tp => lst.foldRight(tp) {(a, b) => TypeSum(a, b)}}
+  ( BaseType ~ ("*" ~> SimpleType) ^^ {case tp1 ~ tp2 => TypePair(tp1, tp2)} |
+    BaseType ~ ("+" ~> SimpleType) ^^ {case tp1 ~ tp2 => TypeSum(tp1, tp2)} |
+    BaseType
     )
   /** BaseType ::= "Bool" | "Nat" | "(" Type ")"
    */
