@@ -133,8 +133,8 @@ object SimplyTypedExtended extends  StandardTokenParsers {
 
       case Inl(t, tp) => Inl(processTerm(t, v), tp)
       case Inr(t, tp) => Inr(processTerm(t, v), tp)
-      case Case(t, vr1, t1, vr2, t2) => Case(processTerm(t), vr1, processTerm(t1), vr2, processTerm(t2))
-      case Fix(t) => Fix(processTerm(t))
+      case Case(t, vr1, t1, vr2, t2) => Case(processTerm(t, v), vr1, processTerm(t1, v), vr2, processTerm(t2, v))
+      case Fix(t) => Fix(processTerm(t, v))
 
       case _ => t
     }
