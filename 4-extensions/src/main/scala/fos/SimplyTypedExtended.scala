@@ -298,18 +298,33 @@ object SimplyTypedExtended extends  StandardTokenParsers {
       case False() => TypeBool
       case Zero() => TypeNat
 
-      case Succ(t0) if(typeof(ctx, t0) == TypeNat) => TypeNat
-      case Pred(t0) if(typeof(ctx, t0) == TypeNat) => TypeNat
-      case IsZero(t0) if(typeof(ctx, t0) == TypeNat) => TypeBool
-      case If(cond, t1, t2) if(typeof(ctx, cond) == TypeBool && typeof(ctx, t1) == typeof(ctx, t2)) => typeof(ctx, t1)
+      case Succ(t0) => {
+        if(typeof(ctx, t0) == TypeNat) TypeNat
+        else throw new TypeError(t, "nat expected but " + typeof(ctx, t0).toString + " found")
+      }
+      case Pred(t0) => {
+        if(typeof(ctx, t0) == TypeNat) TypeNat
+        else throw new TypeError(t, "nat expected but " + typeof(ctx, t0).toString + " found")
+      }
+      case IsZero(t0) => {
+        if(typeof(ctx, t0) == TypeNat) TypeBool
+        else throw new TypeError(t, "nat expected but " + typeof(ctx, t0).toString + " found")
+      }
+      case If(cond, t1, t2) => {
+        if(typeof(ctx, cond) == TypeBool && typeof(ctx, t1) == typeof(ctx, t2)) typeof(ctx, t1)
+        else if(typeof(ctx, cond) == TypeBool) throw new TypeError(t, "parameter type mismatch: expected " + typeof(ctx, t1).toString + ", found " + typeof(ctx, t2).toString)
+        else throw new TypeError(t, "bool expected but " + typeof(ctx, cond).toString + " found")
+      }
 
       case Var(vr) if(ctx.toMap.contains(vr)) => ctx.toMap.apply(vr)
       case Abs(vr, tp, t0) => typeof((vr, tp)::ctx, t0) match {
         case (tp2: Type) => TypeFun(tp, tp2)
       }
       case App(t1, t2) => (typeof(ctx, t1), typeof(ctx, t2)) match {
-        case (TypeFun(tp1, tp2), (tp3: Type)) if(tp1 == tp3) => tp2
-        case (TypeFun(tp1, tp2), (tp3: Type)) if(tp1 != tp3) => throw new TypeError(t, "parameter type mismatch: expected " + tp1.toString + ", found " + tp3.toString)
+        case (TypeFun(tp1, tp2), (tp3: Type)) => {
+          if(tp1 == tp3) tp2
+          else throw new TypeError(t, "parameter type mismatch: expected " + tp1.toString + ", found " + tp3.toString)
+        }
         case ((tp1: Type), _) => throw new TypeError(t, "function type expected but " + tp1.toString + " found")
       }
 
@@ -323,14 +338,28 @@ object SimplyTypedExtended extends  StandardTokenParsers {
         case (tp0: Type) => throw new TypeError(t, "pair type expected but " + tp0.toString + " found")
       }
 
-      case Case(t, vr1, t1, vr2, t2) => typeof(ctx, t) match {
-        case TypeSum(tp1, tp2) if(typeof((vr1, tp1)::ctx, t1)==typeof((vr2, tp2)::ctx, t2)) => typeof((vr1, tp1)::ctx, t1)
+      case Case(t0, vr1, t1, vr2, t2) => typeof(ctx, t0) match {
+        case TypeSum(tp1, tp2) => {
+          val typ1 = typeof((vr1, tp1)::ctx, t1)
+          val typ2 = typeof((vr2, tp2)::ctx, t2)
+          if(typ1==typ2) typ1
+          else throw new TypeError(t, "parameter type mismatch: expected " + typ1.toString + ", found " + typ2.toString)
+        }
         case (tp0: Type) => throw new TypeError(t, "sum type expected but " + tp0.toString + " found")
       }
-      case Inl(t0, TypeSum(tp1, tp2)) if(typeof(ctx, t0) == tp1) => TypeSum(tp1, tp2)
-      case Inr(t0, TypeSum(tp1, tp2)) if(typeof(ctx, t0) == tp2) => TypeSum(tp1, tp2)
+      case Inl(t0, TypeSum(tp1, tp2)) => {
+        if(typeof(ctx, t0) == tp1) TypeSum(tp1, tp2)
+        else throw new TypeError(t, tp1.toString + " expected but " + typeof(ctx, t0).toString + " found")
+      }
+      case Inr(t0, TypeSum(tp1, tp2)) => {
+        if(typeof(ctx, t0) == tp2) TypeSum(tp1, tp2)
+        else throw new TypeError(t, tp2.toString + " expected but " + typeof(ctx, t0).toString + " found")
+      }
       case Fix(t0) => typeof(ctx, t0) match {
-        case TypeFun(tp1, tp2) if(tp1==tp2) => tp1
+        case TypeFun(tp1, tp2) => {
+          if(tp1==tp2) tp1
+          else throw new TypeError(t0, "parameter type mismatch: expected " + tp1.toString + ", found " + tp2.toString)
+        }
         case (tp0: Type) => throw new TypeError(t, "function type expected but " + tp0.toString + " found")
       }
 
