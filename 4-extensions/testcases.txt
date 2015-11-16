@@ -1,0 +1,26 @@
+(\x:Nat.snd x) 1
+
+(\x:Nat.x) true
+
+(\x:Nat->Bool. (\y:Nat.(x y))) (\x:Nat.(iszero x)) 0
+
+case (inr false as Nat + Bool) of inl a => succ a | inr a => 1
+
+case (inl 0 as Nat + Bool) of inl a => iszero pred pred succ a | inr b => b
+
+inr 1 as Nat + Bool
+
+(\y:Nat->Nat. (\f:Nat->Nat. \y:Nat. f y) (\x:Nat. y succ(x)))
+
+(\x:Nat. \y:Nat. iszero (y x))
+
+(\x:Nat. iszero (succ x))
+
+(\x:(Nat->Nat)+Nat . case x of inl x => x 0 | inr x => x) (inl \x:Nat .x as (Nat-> Nat) + Nat)
+
+(\y:Nat->Nat. case inl 4 as Nat+Nat of inl x => y x | inr x => succ (y x)) (\x:Nat. succ x)
+
+fst {(\x:Nat. succ x) 1, (\x:Nat. iszero x) 0}
+
+(\y:Nat*Bool. \x:Nat*Bool. {x, {1,y}} )
+

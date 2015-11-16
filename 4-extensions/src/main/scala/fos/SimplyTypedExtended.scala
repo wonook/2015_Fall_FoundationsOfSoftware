@@ -283,7 +283,7 @@ object SimplyTypedExtended extends  StandardTokenParsers {
   }
 
   /** The context is a list of variable names paired with their type. */
-  type Context = List[Pair[String, Type]]
+  type Context = List[(String, Type)]
 
 /////////////////////////////////////TYPES//////////////////////////
   /** Returns the type of the given term <code>t</code>.
@@ -292,28 +292,34 @@ object SimplyTypedExtended extends  StandardTokenParsers {
    *  @param t   the given term
    *  @return    the computed type
    */
-  def typeof(ctx: Context, t: Term): Type =
+  def typeof(ctx: Context, t: Term): Type = {
     t match {
       case True() => TypeBool
       case False() => TypeBool
       case Zero() => TypeNat
 
       case Succ(t0) => {
-        if(typeof(ctx, t0) == TypeNat) TypeNat
-        else throw new TypeError(t, "nat expected but " + typeof(ctx, t0).toString + " found")
+        val innerType = typeof(ctx, t0)
+        if(innerType == TypeNat) TypeNat
+        else throw new TypeError(t, "nat expected but " + innerType.toString + " found")
       }
       case Pred(t0) => {
-        if(typeof(ctx, t0) == TypeNat) TypeNat
-        else throw new TypeError(t, "nat expected but " + typeof(ctx, t0).toString + " found")
+        val innerType = typeof(ctx, t0)
+        if(innerType == TypeNat) TypeNat
+        else throw new TypeError(t, "nat expected but " + innerType.toString + " found")
       }
       case IsZero(t0) => {
-        if(typeof(ctx, t0) == TypeNat) TypeBool
-        else throw new TypeError(t, "nat expected but " + typeof(ctx, t0).toString + " found")
+        val innerType = typeof(ctx, t0)
+        if(innerType == TypeNat) TypeBool
+        else throw new TypeError(t, "nat expected but " + innerType.toString + " found")
       }
       case If(cond, t1, t2) => {
-        if(typeof(ctx, cond) == TypeBool && typeof(ctx, t1) == typeof(ctx, t2)) typeof(ctx, t1)
-        else if(typeof(ctx, cond) == TypeBool) throw new TypeError(t, "parameter type mismatch: expected " + typeof(ctx, t1).toString + ", found " + typeof(ctx, t2).toString)
-        else throw new TypeError(t, "bool expected but " + typeof(ctx, cond).toString + " found")
+        val condType = typeof(ctx, cond)
+        val t1Type = typeof(ctx, t1)
+        val t2Type = typeof(ctx, t2)
+        if(condType == TypeBool && t1Type == t2Type) t1Type
+        else if(condType == TypeBool) throw new TypeError(t, "parameter type mismatch: expected " + t1Type.toString + ", found " + t2Type.toString)
+        else throw new TypeError(t, "bool expected but " + condType.toString + " found")
       }
 
       case Var(vr) if(ctx.toMap.contains(vr)) => ctx.toMap.apply(vr)
@@ -347,13 +353,23 @@ object SimplyTypedExtended extends  StandardTokenParsers {
         }
         case (tp0: Type) => throw new TypeError(t, "sum type expected but " + tp0.toString + " found")
       }
-      case Inl(t0, TypeSum(tp1, tp2)) => {
-        if(typeof(ctx, t0) == tp1) TypeSum(tp1, tp2)
-        else throw new TypeError(t, tp1.toString + " expected but " + typeof(ctx, t0).toString + " found")
+      case Inl(t0, tp) => tp match {
+        case TypeSum(tp1, tp2) => typeof(ctx, t0) match {
+          case (typ: Type) => {
+            if(typ == tp1) tp
+            else throw new TypeError(t, tp1.toString + " expected but " + typ.toString + " found")
+          }
+        }
+        case _ => throw new TypeError(t, "sum type expected but " + tp.toString + " found")
       }
-      case Inr(t0, TypeSum(tp1, tp2)) => {
-        if(typeof(ctx, t0) == tp2) TypeSum(tp1, tp2)
-        else throw new TypeError(t, tp2.toString + " expected but " + typeof(ctx, t0).toString + " found")
+      case Inr(t0, tp) => tp match {
+        case TypeSum(tp1, tp2) => typeof(ctx, t0) match {
+          case (typ: Type) => {
+            if(typ == tp2) tp
+            else throw new TypeError(t, tp2.toString + " expected but " + typ.toString + " found")
+          }
+        }
+        case _ => throw new TypeError(t, "sum type expected but " + tp.toString + " found")
       }
       case Fix(t0) => typeof(ctx, t0) match {
         case TypeFun(tp1, tp2) => {
@@ -365,6 +381,7 @@ object SimplyTypedExtended extends  StandardTokenParsers {
 
       case _ => throw new TypeError(t, "unexpected term")
     }
+  }
 
   def typeof(t: Term): Type = try {
     typeof(Nil, t)
