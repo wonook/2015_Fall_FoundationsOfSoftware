@@ -11,6 +11,7 @@ object Launcher {
       case Success(term, _) =>
         try {
           val (tpe, c) = Infer.collect(Nil, term)
+//           println("|type: " + tpe + "|c: " + c)
           val sub = Infer.unify(c)
           println("typed: " + sub(tpe))
         } catch {
