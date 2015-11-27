@@ -83,7 +83,7 @@ object Infer {
 
   def typevarinType(tp: Type): List[TypeVar] = tp match {
     case a @ TypeVar(name) => List(a)
-    case FunType(t1, t2) => typevarinType(t1) ::: typevarinType(t2)
+    case FunType(t1, t2) => (typevarinType(t1) ::: typevarinType(t2)).distinct
     case _ => Nil
   }
 
@@ -110,20 +110,6 @@ object Infer {
         }
       }
 
-      def substConstraints(c: Constraint, extend: Map[TypeVar, Type]): Constraint = c match {
-        case (c1: TypeVar, c2: TypeVar) =>
-          val r1 = if(extend.isDefinedAt(c1)) extend.apply(c1) else c1
-          val r2 = if(extend.isDefinedAt(c2)) extend.apply(c2) else c2
-          (r1, r2)
-        case (c1: TypeVar, c2) =>
-          val r1 = if(extend.isDefinedAt(c1)) extend.apply(c1) else c1
-          (r1, c2)
-        case (c1, c2: TypeVar) =>
-          val r2 = if(extend.isDefinedAt(c2)) extend.apply(c2) else c2
-          (c1, r2)
-        case _ => c
-      }
-
 //      println("||unify: " + c + " ||map: " + map.toList)
       if(c.isEmpty) sub => substitute(sub, map)
       else c.head match {
@@ -133,11 +119,11 @@ object Infer {
         case (t1 @ TypeVar(name), t2) if(!typevarinType(t2).exists(_.name == name)) =>
           val extend = Map((t1, t2))
           val newMap = map.map((e) => (e._1, updateType(extend, e._2)))
-          unifyIter(c.tail.map(substConstraints(_, extend)), extend++newMap)
+          unifyIter(c.tail.map((e) => (updateType(extend, e._1), updateType(extend, e._2))), extend++newMap)
         case (t1, t2 @ TypeVar(name)) if(!typevarinType(t1).exists(_.name == name)) =>
           val extend = Map((t2, t1))
           val newMap = map.map((e) => (e._1, updateType(extend, e._2)))
-          unifyIter(c.tail.map(substConstraints(_, extend)), extend++newMap)
+          unifyIter(c.tail.map((e) => (updateType(extend, e._1), updateType(extend, e._2))), extend++newMap)
         case (FunType(a1, a2), FunType(b1, b2)) => unifyIter((a1, b1)::(a2, b2)::c.tail, map)
         case (t1, t2) => throw TypeError("Could not unify: " + t1  + " with " + t2)
       }
