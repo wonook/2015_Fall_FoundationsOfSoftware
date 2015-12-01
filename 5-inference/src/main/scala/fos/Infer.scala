@@ -57,15 +57,19 @@ object Infer {
 			// let x: T = v in t1 => (λx:T. t1) v
 			// Let(str, tp, v, t1) => App(Abs(str, tp, t1), v)
 			case Let(str, tp, v, t1) =>
-				// collect(env, App(Abs(str, tp, t1), v))
-				val (ctp, cc) = collect(env, v)
-        val sub = unify(cc)
-        val typed = sub(ctp)
+        tp match {
+          case EmptyTypeTree() =>
+            val (ctp, cc) = collect(env, v)
+            val sub = unify(cc)
+            val typed = sub(ctp)
 
-        val newEnvTypes = env.map((e) => (e._1, TypeScheme(e._2.params, sub(e._2.tp))))
-        val generalizedTypes = typevarinType(typed).filter((e) => newEnvTypes.forall((e1) => !typevarinType(e1._2.tp).exists(_.name == e.name)))
-        val newEnv = (str, TypeScheme(generalizedTypes, typed))::newEnvTypes
-        collect(newEnv, t1)
+            val newEnvTypes = env.map((e) => (e._1, TypeScheme(e._2.params, sub(e._2.tp))))
+            val generalizedTypes = typevarinType(typed).filterNot((e) => newEnvTypes.exists((e1) => typevarinType(e1._2.tp).exists(_.name == e.name)))
+            val newEnv = (str, TypeScheme(generalizedTypes, typed))::newEnvTypes
+            collect(newEnv, t1)
+          case _ =>
+            collect(env, App(Abs(str, tp, t1), v))
+        }
 		}
 	}
 
